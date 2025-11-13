@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import CipherLayout from '@/components/CipherLayout';
+import FrequencyComparison from '@/components/FrequencyComparison';
+import StepVisualization, { Step } from '@/components/StepVisualization';
 import { encrypt, decrypt } from '@/lib/ciphers/hill';
 
 export default function HillPage() {
@@ -10,12 +12,71 @@ export default function HillPage() {
   const [key, setKey] = useState('');
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [showVisualization, setShowVisualization] = useState(false);
+
+  const generateEncryptionSteps = (text: string, keyStr: string): Step[] => {
+    const steps: Step[] = [];
+    const keyNums = keyStr.split(',').map(n => parseInt(n.trim()));
+    const size = Math.sqrt(keyNums.length);
+    
+    steps.push({
+      title: 'Step 1: Parse Key Matrix',
+      description: `Converting key to ${size}×${size} matrix`,
+      input: keyStr,
+      output: keyNums.join(', '),
+    });
+    
+    // Show matrix
+    const matrixRows = [];
+    for (let i = 0; i < size; i++) {
+      matrixRows.push(keyNums.slice(i * size, (i + 1) * size).join(' '));
+    }
+    
+    steps.push({
+      title: 'Step 2: Key Matrix',
+      description: 'Matrix for multiplication',
+      output: matrixRows.join('\n'),
+    });
+    
+    const cleanText = text.toUpperCase().replace(/[^A-Z]/g, '');
+    steps.push({
+      title: 'Step 3: Prepare Text',
+      description: `Splitting into blocks of ${size}`,
+      input: text,
+      output: cleanText.match(new RegExp(`.{1,${size}}`, 'g'))?.join(' ') || cleanText,
+    });
+    
+    // Show first block encryption
+    if (cleanText.length >= size) {
+      const block = cleanText.substring(0, size);
+      const blockNums = block.split('').map(c => c.charCodeAt(0) - 65);
+      
+      steps.push({
+        title: `Step 4: Encrypt Block '${block}'`,
+        description: 'Matrix multiplication with key',
+        input: block,
+        highlight: `[${blockNums.join(', ')}] × Matrix`,
+      });
+    }
+    
+    steps.push({
+      title: 'Final Result',
+      description: 'All blocks encrypted!',
+      input: text,
+      output: encrypt(text, keyStr),
+    });
+    
+    return steps;
+  };
 
   const handleEncrypt = () => {
     try {
       setError('');
       const result = encrypt(input, key);
       setOutput(result);
+      setSteps(generateEncryptionSteps(input, key));
+      setShowVisualization(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Encryption failed');
     }
@@ -26,6 +87,8 @@ export default function HillPage() {
       setError('');
       const result = decrypt(input, key);
       setOutput(result);
+      setSteps(generateEncryptionSteps(input, key));
+      setShowVisualization(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Decryption failed');
     }
@@ -46,6 +109,20 @@ export default function HillPage() {
       onEncrypt={handleEncrypt}
       onDecrypt={handleDecrypt}
     >
+      {/* Step-by-Step Visualization */}
+      {showVisualization && steps.length > 0 && (
+        <StepVisualization 
+          steps={steps} 
+          isPlaying={true}
+          onComplete={() => console.log('Visualization complete')}
+        />
+      )}
+
+      {/* Frequency Analysis */}
+      {input && output && (
+        <FrequencyComparison inputText={input} outputText={output} />
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

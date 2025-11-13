@@ -3,24 +3,79 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import CipherLayout from '@/components/CipherLayout';
+import FrequencyComparison from '@/components/FrequencyComparison';
+import StepVisualization, { Step } from '@/components/StepVisualization';
 import { encrypt, decrypt } from '@/lib/ciphers/rail';
 
-export default function RailPage() {
+export default function RailFencePage() {
   const [input, setInput] = useState('');
-  const [key, setKey] = useState('3');
+  const [rails, setRails] = useState('3');
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [showVisualization, setShowVisualization] = useState(false);
+
+  const generateEncryptionSteps = (text: string, railsNum: number): Step[] => {
+    const steps: Step[] = [];
+    
+    steps.push({
+      title: 'Step 1: Create Rails',
+      description: `Setting up ${railsNum} rails in zigzag pattern`,
+      highlight: `${railsNum} rails`,
+    });
+    
+    // Build zigzag visualization
+    const fence: string[][] = Array(railsNum).fill(null).map(() => []);
+    let rail = 0;
+    let direction = 1;
+    
+    for (let i = 0; i < Math.min(text.length, 10); i++) {
+      fence[rail].push(text[i]);
+      rail += direction;
+      if (rail === 0 || rail === railsNum - 1) {
+        direction *= -1;
+      }
+    }
+    
+    const zigzagDisplay = fence.map((row, idx) => 
+      `Rail ${idx + 1}: ${row.join(' ')}`
+    ).join('\n');
+    
+    steps.push({
+      title: 'Step 2: Place Characters',
+      description: 'Characters placed in zigzag pattern',
+      input: text.substring(0, 10),
+      output: zigzagDisplay,
+    });
+    
+    steps.push({
+      title: 'Step 3: Read Row by Row',
+      description: 'Concatenate each rail from top to bottom',
+      highlight: 'Read horizontally across each rail',
+    });
+    
+    steps.push({
+      title: 'Final Result',
+      description: 'All rails combined!',
+      input: text,
+      output: encrypt(text, railsNum),
+    });
+    
+    return steps;
+  };
 
   const handleEncrypt = () => {
     try {
       setError('');
-      const rails = parseInt(key);
-      if (isNaN(rails) || rails < 2) {
+      const railsNum = parseInt(rails);
+      if (isNaN(railsNum) || railsNum < 2) {
         setError('Number of rails must be at least 2');
         return;
       }
-      const result = encrypt(input, rails);
+      const result = encrypt(input, railsNum);
       setOutput(result);
+      setSteps(generateEncryptionSteps(input, railsNum));
+      setShowVisualization(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Encryption failed');
     }
@@ -29,13 +84,11 @@ export default function RailPage() {
   const handleDecrypt = () => {
     try {
       setError('');
-      const rails = parseInt(key);
-      if (isNaN(rails) || rails < 2) {
-        setError('Number of rails must be at least 2');
-        return;
-      }
-      const result = decrypt(input, rails);
+      const railsNum = parseInt(rails);
+      const result = decrypt(input, railsNum);
       setOutput(result);
+      setSteps(generateEncryptionSteps(input, railsNum));
+      setShowVisualization(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Decryption failed');
     }
@@ -47,8 +100,8 @@ export default function RailPage() {
       description="A transposition cipher that writes the message in a zigzag pattern across multiple 'rails' and then reads it off row by row."
       input={input}
       setInput={setInput}
-      keyValue={key}
-      setKeyValue={setKey}
+      keyValue={rails}
+      setKeyValue={setRails}
       keyLabel="Number of Rails"
       keyPlaceholder="Enter number of rails (e.g., 3)"
       output={output}
@@ -56,11 +109,25 @@ export default function RailPage() {
       onEncrypt={handleEncrypt}
       onDecrypt={handleDecrypt}
     >
+      {/* Step-by-Step Visualization */}
+      {showVisualization && steps.length > 0 && (
+        <StepVisualization 
+          steps={steps} 
+          isPlaying={true}
+          onComplete={() => console.log('Visualization complete')}
+        />
+      )}
+
+      {/* Frequency Analysis */}
+      {input && output && (
+        <FrequencyComparison inputText={input} outputText={output} />
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="mt-8 p-6 bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl border border-indigo-200"
+        className="mt-8 p-6 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border border-orange-200"
       >
         <h3 className="text-lg font-semibold text-gray-800 mb-3">How it works:</h3>
         <ul className="space-y-2 text-gray-700">
